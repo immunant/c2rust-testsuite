@@ -5,6 +5,8 @@ requirements:
         # - libreadline-dev
         # - rcs # used in makefile
 
+cargo:
+  autogen: true
 transpile:
   autogen: false
   main: nginx
