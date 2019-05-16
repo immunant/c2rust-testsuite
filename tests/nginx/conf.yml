@@ -8,5 +8,5 @@ requirements:
 cargo:
   autogen: true
 transpile:
-  autogen: false
+  autogen: true
   main: nginx
