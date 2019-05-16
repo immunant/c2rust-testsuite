@@ -2,9 +2,9 @@ requirements:
   ubuntu:
     apt:
       packages:
-        # - libreadline-dev
-        # - rcs # used in makefile
-
+        - libgcrypt20
+        - libpcre3-dev
+        - zlib1g-dev
 cargo:
   autogen: true
 transpile:
