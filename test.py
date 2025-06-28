@@ -1,3 +1,15 @@
+#!/usr/bin/env -S uv --quiet run
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#   "distro",
+#   "jinja2",
+#   "scan-build",
+#   "pyyaml",
+#   "scan-build"
+# ]
+# ///
+
 #!/usr/bin/env python3
 
 import argparse

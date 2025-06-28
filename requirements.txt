@@ -1,3 +1,0 @@
-distro
-jinja2
-scan-build
