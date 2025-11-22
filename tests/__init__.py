@@ -1,4 +1,5 @@
 
+from concurrent.futures import ThreadPoolExecutor
 import os
 import sys
 import subprocess
@@ -10,7 +11,7 @@ from tests.requirements import *
 
 class Test(object):
 
-    STAGES: dict = {
+    STAGES: dict[str, list[str]] = {
         "autogen": ["autogen.sh"],
         "configure": ["configure.sh"],
         "make": ["make.sh", "cmake.sh"],
@@ -38,12 +39,14 @@ class Test(object):
             if os.path.isfile(logfile):
                 grep_cmd = ['grep', '-i', '-A', '20', '-E', 'panicked|error', logfile]
                 grep = subprocess.Popen(grep_cmd, stdout=subprocess.PIPE)
+                assert grep.stdout is not None
                 for line in grep.stdout:
                     print(line.decode().rstrip())
 
                 # fall back to tail if grep didn't find anything
                 if grep.returncode != 0:
                     tail = subprocess.Popen(['tail', '-n', '20', logfile], stdout=subprocess.PIPE)
+                    assert tail.stdout is not None
                     for line in tail.stdout:
                         print(line.decode().rstrip())
             else:
@@ -80,7 +83,8 @@ class Test(object):
                 nc=Colors.NO_COLOR,
                 stage=stage,
                 script=relpath)
-            print(line, end="", flush=True)
+        else:
+            line = ""
 
         # if we already have `compile_commands.json`, skip the build stages
         if stage in ["autogen", "configure", "make"]:
@@ -93,7 +97,7 @@ class Test(object):
                     fill = (75 - len(line)) * "."
                     color = Colors.OKBLUE
                     msg = "OK_CACHED"
-                    print(f"{fill} {color}{msg}{Colors.NO_COLOR}")
+                    print(f"{line}{fill} {color}{msg}{Colors.NO_COLOR}")
                 return True
             elif emsg:
                 if verbose:
@@ -103,14 +107,10 @@ class Test(object):
                 except OSError:
                     print(f"could not remove {compile_commands}")
 
-
-        success = False
-
         # noinspection PyBroadException
         try:
-            os.chdir(self.dir)
             if verbose:
-                subprocess.check_call(args=[script_path])
+                subprocess.check_call(args=[script_path], cwd=self.dir)
             else:
                 subprocess.check_call(
                     args=[script_path],
@@ -120,11 +120,11 @@ class Test(object):
                 fill = (75 - len(line)) * "."
                 color = Colors.WARNING if xfail else Colors.OKGREEN
                 msg = "OK_XFAIL" if xfail else "OK"
-                print(f"{fill} {color}{msg}{Colors.NO_COLOR}")
-            success = True
+                print(f"{line}{fill} {color}{msg}{Colors.NO_COLOR}")
+            return True
         except KeyboardInterrupt:
             if not verbose:
-                print(": {color}INTERRUPT{nocolor}".format(
+                print("{line}: {color}INTERRUPT{nocolor}".format(
                     color=Colors.WARNING,
                     nocolor=Colors.NO_COLOR)
                 )
@@ -132,16 +132,14 @@ class Test(object):
         except Exception:  # noqa
             if not verbose:
                 outcome = "XFAIL" if xfail else "FAIL"
-                print("{fill} {color}{outcome}{nocolor}".format(
+                print("{line}{fill} {color}{outcome}{nocolor}".format(
                     fill=(75 - len(line)) * ".",
                     color=Colors.OKBLUE if xfail else Colors.FAIL,
                     outcome=outcome,
                     nocolor=Colors.NO_COLOR)
                 )
                 print_log_tail_on_fail(script_path)
-        finally:
-            os.chdir(prev_dir)
-            return success
+            return False
 
     def ensure_submodule_checkout(self):
         # make sure the `repo` directory exists and is not empty
@@ -175,7 +173,7 @@ class Test(object):
             die(f"expected boolean xfail value; found {xfail}")
         return xfail
 
-    def __call__(self, conf: Config):
+    def run(self, conf: Config) -> bool:
         """Returns true if test was successful or expected to fail, false on unexpected
         failure
         """
@@ -183,7 +181,7 @@ class Test(object):
         self.ensure_submodule_checkout()
 
         stages = Test.STAGES.keys()
-        if conf.stages:
+        if conf.stages is not None:
             # Check that all stages are valid
             for stage in conf.stages:
                 if stage not in Test.STAGES:
@@ -206,15 +204,17 @@ class Test(object):
         return True
 
 
-def run_tests(conf):
+def run_tests(conf: Config):
     if not conf.ignore_requirements:
         check(conf)
 
     tests = [Test(td) for td in conf.project_dirs]
 
-    failure = False
-    for tt in tests:
-        failure |= not tt(conf)
+    def run(tt: Test) -> bool:
+        return tt.run(conf)
 
-    if failure:
+    with ThreadPoolExecutor() as executor:
+        results = executor.map(run, tests)
+
+    if not all(results):
         exit(1)
