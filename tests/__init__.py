@@ -108,9 +108,8 @@ class Test(object):
 
         # noinspection PyBroadException
         try:
-            os.chdir(self.dir)
             if verbose:
-                subprocess.check_call(args=[script_path])
+                subprocess.check_call(args=[script_path], cwd=self.dir)
             else:
                 subprocess.check_call(
                     args=[script_path],
@@ -140,7 +139,6 @@ class Test(object):
                 )
                 print_log_tail_on_fail(script_path)
         finally:
-            os.chdir(prev_dir)
             return success
 
     def ensure_submodule_checkout(self):
