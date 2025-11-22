@@ -107,9 +107,6 @@ class Test(object):
                 except OSError:
                     print(f"could not remove {compile_commands}")
 
-
-        success = False
-
         # noinspection PyBroadException
         try:
             if verbose:
@@ -124,7 +121,7 @@ class Test(object):
                 color = Colors.WARNING if xfail else Colors.OKGREEN
                 msg = "OK_XFAIL" if xfail else "OK"
                 print(f"{line}{fill} {color}{msg}{Colors.NO_COLOR}")
-            success = True
+            return True
         except KeyboardInterrupt:
             if not verbose:
                 print("{line}: {color}INTERRUPT{nocolor}".format(
@@ -142,8 +139,7 @@ class Test(object):
                     nocolor=Colors.NO_COLOR)
                 )
                 print_log_tail_on_fail(script_path)
-        finally:
-            return success
+            return False
 
     def ensure_submodule_checkout(self):
         # make sure the `repo` directory exists and is not empty
